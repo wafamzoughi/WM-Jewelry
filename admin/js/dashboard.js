@@ -6,11 +6,13 @@ const CLOUDINARY_UPLOAD_PRESET = "wm_jewelry_products"; // preset "Unsigned" dan
 const CLOUDINARY_UPLOAD_URL    = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 const EMOJIS = ["💍","📿","⌚","💎","🪙","🌸","⭐","🦋","🌙","🔮","✨","🎀","💄","👑","🌺","🍀","🪷","💐","🌟","🏅"];
-let editingId           = null;
-let selectedEmoji       = "💍";
-let selectedImageBase64 = null;
-let selectedImageUrl    = null;
-let isUploadingImage    = false;
+let editingId      = null;
+let selectedEmoji  = "💍";
+// productImages : tableau ordonné des photos de l'article en cours d'édition.
+// Chaque élément : { tempId, url (Cloudinary une fois uploadée), base64 (aperçu local), uploading }
+// productImages[0] = photo principale (utilisée aussi pour le champ "image" — compat ancien format).
+let productImages  = [];
+let imgTempCounter = 0;
 
 // ── INIT ──
 document.addEventListener("DOMContentLoaded", async () => {
@@ -213,7 +215,7 @@ function populateCatFilter() {
     [...new Set(products.map(p=>p.cat))].map(c=>`<option value="${c}">${CATEGORIES[c]||c}</option>`).join("");
 }
 
-// ── IMAGE UPLOAD vers CLOUDINARY ──
+// ── IMAGES UPLOAD vers CLOUDINARY (multi-images) ──
 function initImageUpload() {
   const dropZone  = document.getElementById("dropZone");
   const fileInput = document.getElementById("fImage");
@@ -221,29 +223,40 @@ function initImageUpload() {
   dropZone.addEventListener("click", ()=>fileInput.click());
   dropZone.addEventListener("dragover",  e=>{e.preventDefault();dropZone.classList.add("drag-over");});
   dropZone.addEventListener("dragleave", ()=>dropZone.classList.remove("drag-over"));
-  dropZone.addEventListener("drop", e=>{e.preventDefault();dropZone.classList.remove("drag-over");const f=e.dataTransfer.files[0];if(f)processImageFile(f);});
-  fileInput.addEventListener("change", ()=>{const f=fileInput.files[0];if(f)processImageFile(f);});
+  dropZone.addEventListener("drop", e=>{
+    e.preventDefault();dropZone.classList.remove("drag-over");
+    [...e.dataTransfer.files].forEach(processImageFile);
+  });
+  fileInput.addEventListener("change", ()=>{
+    [...fileInput.files].forEach(processImageFile);
+    fileInput.value=""; // permet de resélectionner le même fichier plus tard
+  });
+}
+
+function isUploadingImages() {
+  return productImages.some(i => i.uploading);
 }
 
 function processImageFile(file) {
   if (!file.type.startsWith("image/")) { toast("⚠ Image uniquement (JPG, PNG, WEBP)", "error"); return; }
   if (file.size > 10*1024*1024)        { toast("⚠ Image trop lourde (max 10 Mo)",    "error"); return; }
 
+  const entry = { tempId: ++imgTempCounter, base64:null, url:null, uploading:true };
+  productImages.push(entry);
+  renderImageGallery(); updatePreview();
+
   const reader = new FileReader();
   reader.onload = e => {
     resizeImage(e.target.result, 1200, 1200, compressed => {
-      selectedImageBase64 = compressed;
-      selectedImageUrl    = null;
-      isUploadingImage    = true;
-      showImagePreview(compressed, true);
-      updatePreview();
-      uploadToCloudinary(file);
+      entry.base64 = compressed;
+      renderImageGallery(); updatePreview();
+      uploadToCloudinary(file, entry);
     });
   };
   reader.readAsDataURL(file);
 }
 
-function uploadToCloudinary(file) {
+function uploadToCloudinary(file, entry) {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
@@ -253,18 +266,17 @@ function uploadToCloudinary(file) {
     .then(r => r.json())
     .then(data => {
       if (!data.secure_url) throw new Error(data.error?.message || "Pas d'URL");
-      selectedImageUrl    = data.secure_url;
-      isUploadingImage    = false;
-      showImagePreview(data.secure_url, false);
-      updatePreview();
+      entry.url       = data.secure_url;
+      entry.uploading = false;
+      renderImageGallery(); updatePreview();
       toast("✓ Image uploadée sur Cloudinary !");
     })
     .catch(err => {
       console.error("❌ Cloudinary:", err);
-      isUploadingImage = false;
+      entry.uploading = false;
       // Fallback : garder le base64 (fonctionnera mais plus lourd)
-      selectedImageUrl = selectedImageBase64;
-      showImagePreview(selectedImageBase64, false);
+      entry.url = entry.base64;
+      renderImageGallery(); updatePreview();
       toast("⚠ Cloudinary indisponible — image sauvegardée en base64", "error");
     });
 }
@@ -281,36 +293,42 @@ function resizeImage(src, maxW, maxH, cb) {
   img.src=src;
 }
 
-function showImagePreview(src, uploading) {
-  document.getElementById("dropZone").innerHTML = `
-    <div class="img-preview-wrap">
-      <img src="${src}" alt="Aperçu" class="img-preview-thumb">
-      <div class="img-preview-actions">
-        <span class="img-preview-ok">
-          ${uploading
-            ? `<span style="color:#B45309">⏳ Upload en cours...</span>`
-            : `<span style="color:#166534">✓ Image prête</span>`}
-        </span>
-        ${uploading
-          ? `<div style="width:100%;height:3px;background:#EDE8DF;border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;background:#B8902A;border-radius:2px;animation:progress 1.5s ease-in-out infinite"></div></div><style>@keyframes progress{0%{width:0}100%{width:100%}}</style>`
-          : `<button type="button" class="img-remove-btn" onclick="removeImage(event)">✕ Changer</button>`}
+// Affiche la galerie de vignettes sous la zone de dépôt.
+function renderImageGallery() {
+  const gallery = document.getElementById("imageGallery");
+  if (!gallery) return;
+  gallery.innerHTML = productImages.map((item, idx) => `
+    <div class="gallery-item ${idx===0?'main-item':''}">
+      <img src="${item.url||item.base64}" alt="Photo ${idx+1}">
+      ${idx===0 ? `<span class="gallery-badge">Principale</span>` : ``}
+      ${item.uploading ? `<div class="gallery-uploading">⏳</div>` : ``}
+      <div class="gallery-actions">
+        ${idx!==0 ? `<button type="button" onclick="setMainImage(${item.tempId})" title="Définir comme principale">★</button>` : ``}
+        <button type="button" onclick="removeImageAt(${item.tempId})" title="Supprimer">✕</button>
       </div>
-    </div>`;
+    </div>`).join("");
 }
 
-function removeImage(e) {
-  e.stopPropagation();
-  selectedImageBase64=null; selectedImageUrl=null; isUploadingImage=false;
-  document.getElementById("fImage").value="";
-  resetDropZone(); updatePreview();
+function setMainImage(tempId) {
+  const idx = productImages.findIndex(i => i.tempId === tempId);
+  if (idx > 0) {
+    const [item] = productImages.splice(idx, 1);
+    productImages.unshift(item);
+    renderImageGallery(); updatePreview();
+  }
+}
+
+function removeImageAt(tempId) {
+  productImages = productImages.filter(i => i.tempId !== tempId);
+  renderImageGallery(); updatePreview();
 }
 
 function resetDropZone() {
   document.getElementById("dropZone").innerHTML=`
     <div class="drop-inner">
       <div class="drop-icon">🖼️</div>
-      <div class="drop-text">Glissez une image ici<br><span>ou cliquez pour choisir</span></div>
-      <div class="drop-hint">JPG, PNG, WEBP — max 10 Mo</div>
+      <div class="drop-text">Glissez une ou plusieurs images ici<br><span>ou cliquez pour choisir des fichiers</span></div>
+      <div class="drop-hint">JPG, PNG, WEBP — max 5 Mo/image · La 1ère image = photo principale</div>
     </div>`;
 }
 
@@ -338,7 +356,8 @@ function updatePreview() {
   const price = parseFloat(document.getElementById("fPrice")?.value)||0;
   const cat   = document.getElementById("fCat")?.value||"";
   const pvImg=document.getElementById("pvImg"), pvEmoji=document.getElementById("pvEmoji");
-  const imgSrc=selectedImageUrl||selectedImageBase64;
+  const main=productImages[0];
+  const imgSrc=main ? (main.url||main.base64) : null;
   if(imgSrc){pvImg.src=imgSrc;pvImg.style.display="block";pvEmoji.style.display="none";}
   else{pvImg.style.display="none";pvEmoji.style.display="block";pvEmoji.textContent=selectedEmoji;}
   document.getElementById("pvName").textContent  = name;
@@ -354,9 +373,9 @@ function clearForm() {
   document.getElementById("fFeatured").value="false";
   document.getElementById("fNew").value="false";
   document.getElementById("fImage").value="";
-  selectedEmoji=selectedImageBase64=selectedImageUrl=null; isUploadingImage=false; editingId=null;
+  productImages=[]; editingId=null;
   selectedEmoji="💍";
-  buildEmojiGrid(); resetDropZone(); updatePreview();
+  buildEmojiGrid(); resetDropZone(); renderImageGallery(); updatePreview();
 }
 function cancelEdit(){clearForm();showSection("products");}
 
@@ -373,10 +392,10 @@ async function saveProduct() {
   if (!name)                     {toast("⚠ Saisir le nom","error");return;}
   if (isNaN(price)||price<0)     {toast("⚠ Prix invalide","error");return;}
   if (isNaN(stock)||stock<0)     {toast("⚠ Stock invalide","error");return;}
-  if (isUploadingImage)          {toast("⏳ Attendez la fin de l'upload","error");return;}
+  if (isUploadingImages())       {toast("⏳ Attendez la fin de l'upload","error");return;}
 
-  const imageToSave = selectedImageUrl || selectedImageBase64 || null;
-  const productData = {name,price,stock,cat,emoji:selectedEmoji,image:imageToSave,desc,featured,isNew};
+  const images = productImages.map(i => i.url || i.base64).filter(Boolean);
+  const productData = {name,price,stock,cat,emoji:selectedEmoji,image:images[0]||null,images,desc,featured,isNew};
 
   if (editingId) {
     const idx=products.findIndex(p=>p.id===editingId);
@@ -403,7 +422,7 @@ async function saveProduct() {
 function editProduct(id) {
   const p=products.find(x=>x.id===id); if(!p) return;
   editingId=id; selectedEmoji=p.emoji||"💍";
-  selectedImageBase64=null; selectedImageUrl=p.image||null; isUploadingImage=false;
+  productImages = getImages(p).map(url => ({tempId:++imgTempCounter, url, base64:null, uploading:false}));
   document.getElementById("fName").value    =p.name;
   document.getElementById("fPrice").value   =p.price;
   document.getElementById("fStock").value   =getStock(p)===null?0:p.stock;
@@ -412,7 +431,7 @@ function editProduct(id) {
   document.getElementById("fFeatured").value=p.featured?"true":"false";
   document.getElementById("fNew").value     =p.isNew?"true":"false";
   buildEmojiGrid();
-  if(p.image) showImagePreview(p.image,false); else resetDropZone();
+  resetDropZone(); renderImageGallery();
   document.getElementById("formTitle").textContent="✏ Modifier l'Article";
   updatePreview(); showSection("add");
 }

@@ -139,17 +139,18 @@
           <div class="emoji-grid" id="emojiGrid"></div>
         </div>
 
-        <!-- IMAGE UPLOAD -->
+        <!-- IMAGES UPLOAD (plusieurs photos) -->
         <div class="form-group full">
-          <label>Photo de l'article</label>
-          <input type="file" id="fImage" accept="image/*" style="display:none">
+          <label>Photos de l'article</label>
+          <input type="file" id="fImage" accept="image/*" multiple style="display:none">
           <div class="drop-zone" id="dropZone">
             <div class="drop-inner">
               <div class="drop-icon">🖼️</div>
-              <div class="drop-text">Glissez une image ici<br><span>ou cliquez pour choisir un fichier</span></div>
-              <div class="drop-hint">JPG, PNG, WEBP — max 5 Mo · Redimensionnement automatique</div>
+              <div class="drop-text">Glissez une ou plusieurs images ici<br><span>ou cliquez pour choisir des fichiers</span></div>
+              <div class="drop-hint">JPG, PNG, WEBP — max 5 Mo/image · La 1ère image = photo principale</div>
             </div>
           </div>
+          <div class="image-gallery" id="imageGallery"></div>
         </div>
 
         <div class="form-group full">

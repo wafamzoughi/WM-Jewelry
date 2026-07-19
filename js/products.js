@@ -54,10 +54,21 @@ const DEFAULT_PRODUCTS = [
   {id:5,  name:"Bague Solitaire Zircon", price:16.900, cat:"bagues",    emoji:"🪙", image:null, desc:"Bague fine avec pierre zirconium AAA, disponible tailles 50 à 60.",                  featured:true,  isNew:false, stock:2},
 ];
 
+// ── HELPERS VARIANTES ──
+// Un produit a des variantes seulement si "variants" existe et contient au moins 1 élément.
+// Tout le reste du code doit passer par ces fonctions plutôt que de lire p.variants directement.
+function hasVariants(p) {
+  return !!(p && Array.isArray(p.variants) && p.variants.length > 0);
+}
+
 // ── HELPERS STOCK ──
 // Les anciens produits enregistrés avant cette mise à jour n'ont pas de champ "stock".
 // On les considère "stock illimité" (non suivi) pour ne rien casser.
+// Si le produit a des variantes, le stock global = somme des stocks des variantes.
 function getStock(p) {
+  if (hasVariants(p)) {
+    return p.variants.reduce((sum, v) => sum + (v.stock || 0), 0);
+  }
   return (p && p.stock !== undefined && p.stock !== null) ? p.stock : null;
 }
 function isOutOfStock(p) {
@@ -67,6 +78,45 @@ function isOutOfStock(p) {
 function isLowStock(p) {
   const s = getStock(p);
   return s !== null && s > 0 && s <= LOW_STOCK_THRESHOLD;
+}
+
+// ── HELPERS IMAGES ──
+// Retourne toujours un tableau d'URLs, jamais null/undefined.
+// Priorité : p.images (galerie) → sinon p.image (ancien format, un seul champ) → sinon [].
+function getImages(p) {
+  if (p && Array.isArray(p.images) && p.images.length > 0) {
+    return p.images.filter(Boolean);
+  }
+  if (p && p.image) {
+    return [p.image];
+  }
+  return [];
+}
+// Image principale à afficher dans les listes/cartes produit.
+function getMainImage(p) {
+  const imgs = getImages(p);
+  return imgs.length > 0 ? imgs[0] : null;
+}
+
+// ── HELPERS PRIX ──
+// Si le produit a des variantes avec des prix différents, renvoie {min, max}.
+// Sinon renvoie {min: p.price, max: p.price} (comportement actuel, prix unique).
+function getPriceRange(p) {
+  if (hasVariants(p)) {
+    const prices = p.variants
+      .map(v => (v.price !== undefined && v.price !== null) ? v.price : p.price)
+      .filter(price => price !== undefined && price !== null);
+    if (prices.length > 0) {
+      return { min: Math.min(...prices), max: Math.max(...prices) };
+    }
+  }
+  return { min: p.price, max: p.price };
+}
+// Texte prêt à afficher : "16.900 DT" ou "16.900 – 17.900 DT" si prix variables.
+function formatPriceRange(p) {
+  const { min, max } = getPriceRange(p);
+  if (min === max) return `${min.toFixed(3)} DT`;
+  return `${min.toFixed(3)} – ${max.toFixed(3)} DT`;
 }
 
 // ── STATE ──
