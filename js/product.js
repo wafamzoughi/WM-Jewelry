@@ -4,6 +4,8 @@ const WA_NUMBER = "21627820895";
 let cart = [];
 let currentProduct = null;
 let selectedQty    = 1;
+let pdImages       = [];  // galerie d'images du produit affiché
+let pdImgIndex     = 0;   // index de l'image actuellement affichée en grand
 
 document.addEventListener("DOMContentLoaded", async () => {
   try { const _sc = localStorage.getItem("wm_cart"); if (_sc) cart = JSON.parse(_sc); } catch(e) {}
@@ -56,9 +58,11 @@ function loadProduct() {
 }
 
 function renderProduct(p) {
-  const hasImg = !!p.image;
+  pdImages   = getImages(p);
+  pdImgIndex = 0;
+  const hasImg = pdImages.length > 0;
   const imgHtml = hasImg
-    ? `<img src="${p.image}" alt="${p.name}" class="pd-main-img" id="pdMainImg"
+    ? `<img src="${pdImages[0]}" alt="${p.name}" class="pd-main-img" id="pdMainImg"
          onerror="this.outerHTML='<div class=pd-emoji-img>${p.emoji}</div>'">`
     : `<div class="pd-emoji-img">${p.emoji}</div>`;
 
@@ -71,6 +75,13 @@ function renderProduct(p) {
   else if (lowStock)    stockStatusHtml = `<div class="pd-stock-status pd-stock-low"><span>●</span> Plus que ${stock} en stock</div>`;
   else if (stock !== null) stockStatusHtml = `<div class="pd-stock-status pd-stock-ok"><span>●</span> En stock</div>`;
 
+  const thumbsHtml = hasImg
+    ? pdImages.map((img, i) => `
+        <div class="pd-thumb${i===0?' active':''}" onclick="switchMainImage(${i})">
+          <img src="${img}" alt="${p.name} — photo ${i+1}">
+        </div>`).join("")
+    : `<div class="pd-thumb active"><span>${p.emoji}</span></div>`;
+
   document.getElementById("productPage").innerHTML = `
     <div class="pd-layout">
       <div class="pd-left">
@@ -81,9 +92,7 @@ function renderProduct(p) {
           ${p.featured ? '<span class="pd-badge-feat">⭐ Vedette</span>'  : ""}
         </div>
         <div class="pd-thumbs">
-          <div class="pd-thumb active">
-            ${p.image ? `<img src="${p.image}" alt="${p.name}">` : `<span>${p.emoji}</span>`}
-          </div>
+          ${thumbsHtml}
         </div>
       </div>
 
@@ -151,8 +160,8 @@ function renderRelated(p) {
   document.getElementById("relatedGrid").innerHTML = related.map(r => `
     <div class="related-card${isOutOfStock(r)?' is-out-of-stock':''}" onclick="window.location.href='product.html?id=${r.id}'">
       <div class="related-img">
-        ${r.image
-          ? `<img src="${r.image}" alt="${r.name}" loading="lazy"
+        ${getMainImage(r)
+          ? `<img src="${getMainImage(r)}" alt="${r.name}" loading="lazy"
                onerror="this.outerHTML='<span>${r.emoji}</span>'">`
           : `<span>${r.emoji}</span>`}
         ${isOutOfStock(r) ? '<span class="related-badge-out">Rupture</span>' : ""}
@@ -162,6 +171,15 @@ function renderRelated(p) {
         <div class="related-price">${r.price.toFixed(3)} DT</div>
       </div>
     </div>`).join("");
+}
+
+// ── GALERIE — changer l'image principale via une miniature ──
+function switchMainImage(i) {
+  if (!pdImages[i]) return;
+  pdImgIndex = i;
+  const img = document.getElementById("pdMainImg");
+  if (img) img.src = pdImages[i];
+  document.querySelectorAll(".pd-thumb").forEach((el, idx) => el.classList.toggle("active", idx === i));
 }
 
 // ── ZOOM IMAGE ──
@@ -181,21 +199,36 @@ function initImageZoomHover() {
 }
 
 function openImageLightbox() {
-  const p = currentProduct;
-  if (!p || !p.image) return;
+  if (!pdImages.length) return;
+  const multi = pdImages.length > 1;
   let lb = document.getElementById("imgLightbox");
   if (!lb) {
     lb = document.createElement("div");
     lb.id = "imgLightbox";
     lb.className = "img-lightbox";
-    lb.innerHTML = `<button class="lightbox-close" onclick="closeImageLightbox()" aria-label="Fermer">×</button><img id="lightboxImg" src="" alt="">`;
+    lb.innerHTML = `
+      <button class="lightbox-close" onclick="closeImageLightbox()" aria-label="Fermer">×</button>
+      ${multi ? `<button class="lightbox-nav lightbox-prev" onclick="lightboxNav(-1)" aria-label="Image précédente">‹</button>` : ""}
+      <img id="lightboxImg" src="" alt="">
+      ${multi ? `<button class="lightbox-nav lightbox-next" onclick="lightboxNav(1)" aria-label="Image suivante">›</button>` : ""}`;
     lb.addEventListener("click", e => { if (e.target === lb) closeImageLightbox(); });
-    document.addEventListener("keydown", e => { if (e.key === "Escape") closeImageLightbox(); });
+    document.addEventListener("keydown", e => {
+      if (!lb.classList.contains("open")) return;
+      if (e.key === "Escape")     closeImageLightbox();
+      if (e.key === "ArrowLeft")  lightboxNav(-1);
+      if (e.key === "ArrowRight") lightboxNav(1);
+    });
     document.body.appendChild(lb);
   }
-  document.getElementById("lightboxImg").src = p.image;
+  document.getElementById("lightboxImg").src = pdImages[pdImgIndex];
   requestAnimationFrame(() => lb.classList.add("open"));
   document.body.style.overflow = "hidden";
+}
+function lightboxNav(delta) {
+  if (pdImages.length < 2) return;
+  pdImgIndex = (pdImgIndex + delta + pdImages.length) % pdImages.length;
+  document.getElementById("lightboxImg").src = pdImages[pdImgIndex];
+  switchMainImage(pdImgIndex);
 }
 function closeImageLightbox() {
   const lb = document.getElementById("imgLightbox");
