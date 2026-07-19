@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WM Jewelry — Dashboard Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <svg viewBox="0 0 60 60" width="40" height="40">
+      <circle cx="30" cy="30" r="28" fill="#F5EDD5" stroke="#B8902A" stroke-width="1.5"/>
+      <text x="30" y="22" text-anchor="middle" font-family="Cormorant Garamond,serif" font-size="7" fill="#7C5E18" letter-spacing="3" font-weight="600">WM</text>
+      <polygon points="30,26 34,31 30,36 26,31" fill="none" stroke="#B8902A" stroke-width="0.8"/>
+      <path d="M16,37 L20,47 L25,41 L30,47 L35,41 L40,47 L44,37" fill="none" stroke="#B8902A" stroke-width="1.2" stroke-linejoin="round"/>
+    </svg>
+    <div>
+      <div class="sidebar-brand">WM JEWELRY</div>
+      <div class="sidebar-role">Administration</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <a class="nav-item active" onclick="showSection('dashboard')">
+      <span class="nav-icon">📊</span> Tableau de bord
+    </a>
+    <a class="nav-item" onclick="showSection('products')">
+      <span class="nav-icon">💎</span> Articles
+    </a>
+    <a class="nav-item" onclick="showSection('add')">
+      <span class="nav-icon">➕</span> Ajouter article
+    </a>
+    <a class="nav-item" onclick="showSection('categories')">
+      <span class="nav-icon">🗂️</span> Catégories
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    <a href="../index.html" target="_blank" class="sidebar-link">🌐 Voir la boutique</a>
+    <button class="logout-btn" onclick="logout()">🚪 Déconnexion</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main-content">
+
+  <!-- TOP BAR -->
+  <div class="topbar">
+    <div class="topbar-title" id="topbarTitle">Tableau de bord</div>
+    <div class="topbar-right">
+      <span class="admin-tag">👤 Admin</span>
+    </div>
+  </div>
+
+  <!-- DASHBOARD SECTION -->
+  <section id="sec-dashboard" class="section active">
+    <div class="stats-grid" id="statsGrid"></div>
+    <div class="dash-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Articles récents</h3>
+          <button class="btn-sm" onclick="showSection('products')">Voir tout</button>
+        </div>
+        <div id="recentProducts"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><h3>Répartition catégories</h3></div>
+        <div id="catChart"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRODUCTS SECTION -->
+  <section id="sec-products" class="section">
+    <div class="section-bar">
+      <div class="search-wrap">
+        <input type="text" id="searchInput" placeholder="🔍 Rechercher un article..." oninput="renderProductsTable()">
+        <select id="filterCat" onchange="renderProductsTable()">
+          <option value="">Toutes catégories</option>
+        </select>
+      </div>
+      <button class="btn-gold" onclick="showSection('add')">+ Ajouter un article</button>
+    </div>
+    <div class="table-wrap">
+      <table class="products-table">
+        <thead>
+          <tr>
+            <th>Article</th><th>Catégorie</th><th>Prix</th><th>Stock</th><th>Statut</th><th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="productsTableBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ADD / EDIT SECTION -->
+  <section id="sec-add" class="section">
+    <div class="form-panel">
+      <h2 class="form-title" id="formTitle">➕ Nouvel Article</h2>
+
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Nom de l'article *</label>
+          <input type="text" id="fName" placeholder="Ex: Bracelet doré élégant">
+        </div>
+        <div class="form-group">
+          <label>Prix (DT) *</label>
+          <input type="number" id="fPrice" placeholder="Ex: 24.900" step="0.001" min="0">
+        </div>
+        <div class="form-group">
+          <label>Stock disponible *</label>
+          <input type="number" id="fStock" placeholder="Ex: 10" step="1" min="0">
+          <div class="field-hint">0 = article en rupture de stock</div>
+        </div>
+        <div class="form-group">
+          <label>Catégorie *</label>
+          <select id="fCat">
+            <option value="boucles">Boucles d'oreilles</option>
+            <option value="colliers">Colliers</option>
+            <option value="bracelets">Bracelets</option>
+            <option value="bagues">Bagues</option>
+            <option value="montres">Montres</option>
+            <option value="cheveux">Accessoires cheveux</option>
+            <option value="pinces">Pinces & Barrettes</option>
+            <option value="bondes">Bandes & Élastiques</option>
+            <option value="autres">Autres</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Icône de secours (si pas d'image)</label>
+          <div class="emoji-grid" id="emojiGrid"></div>
+        </div>
+
+        <!-- IMAGE UPLOAD -->
+        <div class="form-group full">
+          <label>Photo de l'article</label>
+          <input type="file" id="fImage" accept="image/*" style="display:none">
+          <div class="drop-zone" id="dropZone">
+            <div class="drop-inner">
+              <div class="drop-icon">🖼️</div>
+              <div class="drop-text">Glissez une image ici<br><span>ou cliquez pour choisir un fichier</span></div>
+              <div class="drop-hint">JPG, PNG, WEBP — max 5 Mo · Redimensionnement automatique</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group full">
+          <label>Description</label>
+          <textarea id="fDesc" rows="3" placeholder="Description courte, matière, taille, etc."></textarea>
+        </div>
+        <div class="form-group">
+          <label>Mise en avant</label>
+          <select id="fFeatured">
+            <option value="false">Article normal</option>
+            <option value="true">⭐ Article vedette</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Badge "Nouveau"</label>
+          <select id="fNew">
+            <option value="false">Non</option>
+            <option value="true">Oui — afficher le badge</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="preview-box" id="previewBox">
+        <div class="preview-label">Aperçu carte produit</div>
+        <div class="preview-card" id="previewCard">
+          <div class="preview-img-wrap">
+            <img id="pvImg" src="" alt="" style="display:none">
+            <div class="preview-emoji" id="pvEmoji">💍</div>
+          </div>
+          <div class="preview-info">
+            <div class="preview-cat" id="pvCat">Catégorie</div>
+            <div class="preview-name" id="pvName">Nom de l'article</div>
+            <div class="preview-price" id="pvPrice">0.000 DT</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-actions">
+        <button class="btn-gold" onclick="saveProduct()">💾 Enregistrer l'article</button>
+        <button class="btn-outline" onclick="cancelEdit()">Annuler</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORIES SECTION -->
+  <section id="sec-categories" class="section">
+    <div class="panel">
+      <div class="panel-header"><h3>Catégories disponibles</h3></div>
+      <div id="catList"></div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/auth.js"></script>
+<script src="../js/products.js"></script>
+<script src="js/dashboard.js"></script>
+</body>
+</html>

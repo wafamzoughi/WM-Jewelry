@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WM Jewelry — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --gold:#B8902A;--gold-light:#D4AF5A;--gold-pale:#F5EDD5;--gold-dark:#7C5E18;
+  --cream:#FAF7F0;--white:#fff;--black:#1A1209;--gray:#6B6355;--gray-light:#EDE8DF;
+  --font-serif:'Cormorant Garamond',serif;--font-sans:'Outfit',sans-serif;
+}
+body{font-family:var(--font-sans);background:var(--black);min-height:100vh;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+body::before{content:'';position:absolute;inset:0;background:url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='%23B8902A' stroke-width='0.3' opacity='0.15'%3E%3Ccircle cx='30' cy='30' r='20'/%3E%3Ccircle cx='30' cy='30' r='10'/%3E%3Cline x1='10' y1='30' x2='50' y2='30'/%3E%3Cline x1='30' y1='10' x2='30' y2='50'/%3E%3C/g%3E%3C/svg%3E") repeat}
+.login-box{background:rgba(26,18,9,0.95);border:1px solid rgba(184,144,42,0.3);border-radius:12px;padding:48px 40px;width:380px;max-width:92vw;position:relative;z-index:1;backdrop-filter:blur(10px)}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-logo svg{display:block;margin:0 auto 12px}
+.login-logo .brand{font-family:var(--font-serif);font-size:24px;color:var(--gold-light);letter-spacing:3px;display:block}
+.login-logo .sub{font-size:10px;color:rgba(255,255,255,0.4);letter-spacing:3px;margin-top:4px}
+.admin-badge{background:rgba(184,144,42,0.15);border:1px solid rgba(184,144,42,0.3);color:var(--gold-light);font-size:11px;padding:5px 14px;border-radius:20px;display:inline-block;margin-bottom:28px;letter-spacing:2px}
+h2{font-family:var(--font-serif);font-size:28px;color:white;font-weight:300;margin-bottom:6px;text-align:center}
+.login-sub{color:rgba(255,255,255,0.4);font-size:13px;text-align:center;margin-bottom:28px}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,0.5);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px}
+.form-group input{width:100%;background:rgba(255,255,255,0.05);border:1px solid rgba(184,144,42,0.2);border-radius:6px;padding:12px 16px;font-family:var(--font-sans);font-size:14px;color:white;outline:none;transition:border .2s}
+.form-group input:focus{border-color:var(--gold)}
+.form-group input::placeholder{color:rgba(255,255,255,0.25)}
+.login-btn{width:100%;background:var(--gold);color:white;border:none;padding:14px;font-family:var(--font-sans);font-size:14px;font-weight:600;cursor:pointer;border-radius:6px;margin-top:8px;letter-spacing:1px;transition:background .2s}
+.login-btn:hover{background:var(--gold-dark)}
+.error-msg{background:rgba(192,57,43,0.15);border:1px solid rgba(192,57,43,0.3);color:#e74c3c;font-size:13px;padding:10px 14px;border-radius:6px;margin-top:12px;display:none;text-align:center}
+.back-link{display:block;text-align:center;margin-top:20px;color:rgba(255,255,255,0.35);font-size:13px;text-decoration:none;transition:color .2s}
+.back-link:hover{color:var(--gold-light)}
+.hint{color:rgba(255,255,255,0.25);font-size:11px;text-align:center;margin-top:16px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<div class="login-box">
+  <div class="login-logo">
+    <svg viewBox="0 0 60 60" width="56" height="56">
+      <circle cx="30" cy="30" r="28" fill="rgba(184,144,42,0.1)" stroke="#B8902A" stroke-width="1"/>
+      <text x="30" y="22" text-anchor="middle" font-family="Cormorant Garamond,serif" font-size="7" fill="#D4AF5A" letter-spacing="3" font-weight="400">WM</text>
+      <polygon points="30,26 34,31 30,36 26,31" fill="none" stroke="#D4AF5A" stroke-width="0.8"/>
+      <path d="M16,37 L20,47 L25,41 L30,47 L35,41 L40,47 L44,37" fill="none" stroke="#B8902A" stroke-width="1.2" stroke-linejoin="round"/>
+    </svg>
+    <span class="brand">WM JEWELRY</span>
+    <span class="sub">ESPACE ADMINISTRATION</span>
+  </div>
+
+  <div style="text-align:center">
+    <span class="admin-badge">🔒 ACCÈS RESTREINT</span>
+  </div>
+
+  <h2>Connexion Admin</h2>
+  <p class="login-sub">Réservé au propriétaire du site</p>
+
+  <div class="form-group">
+    <label>Identifiant</label>
+    <input type="text" id="username" placeholder="admin" autocomplete="username" value="admin">
+  </div>
+  <div class="form-group">
+    <label>Mot de passe</label>
+    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" value="wm2025" onkeydown="if(event.key==='Enter') login()">
+  </div>
+  <button class="login-btn" onclick="login()">Connexion →</button>
+  <div class="error-msg" id="errorMsg">Identifiant ou mot de passe incorrect.</div>
+
+  <a href="/index.html" class="back-link">← Retour à la boutique</a>
+  <p class="hint">Identifiant: <strong style="color:rgba(255,255,255,0.5)">admin</strong> / <strong style="color:rgba(255,255,255,0.5)">wm2025</strong></p>
+</div>
+
+<script>
+// ── AUTH CODE INTÉGRÉ ──
+const ADMIN_CREDENTIALS = {
+  username: "admin",
+  password: "wm2025"
+};
+
+function checkCredentials(user, pass) {
+  return user === ADMIN_CREDENTIALS.username && pass === ADMIN_CREDENTIALS.password;
+}
+
+function login() {
+  const user = document.getElementById("username").value.trim();
+  const pass = document.getElementById("password").value;
+  
+  if (checkCredentials(user, pass)) {
+    sessionStorage.setItem("wm_admin_auth", "1");
+    window.location.href = "/admin/dashboard.html";
+  } else {
+    const err = document.getElementById("errorMsg");
+    err.style.display = "block";
+    setTimeout(() => err.style.display = "none", 3000);
+  }
+}
+
+if (sessionStorage.getItem("wm_admin_auth") === "1") {
+  window.location.href = "/admin/dashboard.html";
+}
+</script>
+</body>
+</html>
