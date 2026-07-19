@@ -475,6 +475,39 @@
   color: var(--gold-light);
   background: rgba(184,144,42,0.08);
 }
+.products-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 8px;
+}
+.products-toolbar .filter-bar { margin-bottom: 0; justify-content: flex-start; flex: 1; }
+.sort-bar { display: flex; align-items: center; gap: 8px; }
+.sort-label {
+  font-family: 'Outfit', sans-serif;
+  font-size: 11px;
+  color: rgb(27 21 21 / 50%);
+  white-space: nowrap;
+}
+.sort-select {
+  background: transparent;
+  border: 1px solid rgba(184,144,42,0.15);
+  color: var(--gold-dark);
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 12px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+}
+.sort-select:hover, .sort-select:focus { border-color: var(--gold-light); }
+@media (max-width: 640px) {
+  .products-toolbar { flex-direction: column; align-items: stretch; }
+  .sort-bar { justify-content: space-between; }
+}
 .products-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -1021,7 +1054,20 @@
     <p class="section-eyebrow">Notre sélection</p>
     <h2>Collection</h2>
   </div>
-  <div class="filter-bar" id="filterBar"></div>
+  <div class="products-toolbar">
+    <div class="filter-bar" id="filterBar"></div>
+    <div class="sort-bar">
+      <label for="sortSelect" class="sort-label">Trier par</label>
+      <select id="sortSelect" class="sort-select" onchange="setSortOrder(this.value)">
+        <option value="default">Nouveautés</option>
+        <option value="price-asc">Prix croissant</option>
+        <option value="price-desc">Prix décroissant</option>
+        <option value="name-asc">Nom (A–Z)</option>
+        <option value="rating-desc">Mieux notés</option>
+        <option value="popular">Les plus vus</option>
+      </select>
+    </div>
+  </div>
   <div class="products-grid" id="productsGrid"></div>
 </section>
 

@@ -4,6 +4,7 @@ const WA_NUMBER = "21627820895";
 let cart = [];
 try { const _sc = localStorage.getItem("wm_cart"); if (_sc) cart = JSON.parse(_sc); } catch(e) {}
 let currentFilter = "all";
+let currentSort   = "default";
 
 // ── INIT : attend que les produits soient chargés ──
 document.addEventListener("DOMContentLoaded", async () => {
@@ -81,7 +82,8 @@ function renderFilterBar() {
 function renderProducts() {
   const grid = document.getElementById("productsGrid");
   if (!grid) return;
-  const filtered = currentFilter === "all" ? products : products.filter(p => p.cat === currentFilter);
+  let filtered = currentFilter === "all" ? [...products] : products.filter(p => p.cat === currentFilter);
+  filtered = sortProducts(filtered);
 
   if (!filtered.length) {
     grid.innerHTML = `<div class="no-products"><div class="no-products-icon">✦</div><p>Aucun article dans cette catégorie.</p></div>`;
@@ -108,6 +110,7 @@ function renderProducts() {
       <div class="product-body">
         <div class="product-cat">${CATEGORIES[p.cat] || p.cat}</div>
         <h3 class="product-name">${p.name}</h3>
+        ${renderRatingStars(p.id)}
         ${!outOfStock && lowStock ? `<div class="product-stock-note">Plus que ${stock} en stock</div>` : ""}
         <div class="product-footer">
           <span class="product-price">${p.price.toFixed(3)} DT</span>
@@ -120,6 +123,25 @@ function renderProducts() {
     </div>
   `;
   }).join("");
+}
+
+// ── TRI ──
+function sortProducts(list) {
+  switch (currentSort) {
+    case "price-asc":  return list.sort((a, b) => a.price - b.price);
+    case "price-desc": return list.sort((a, b) => b.price - a.price);
+    case "name-asc":   return list.sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    case "rating-desc": {
+      const rate = p => getAverageRating(p.id) ?? -1;
+      return list.sort((a, b) => rate(b) - rate(a));
+    }
+    case "popular":    return list.sort((a, b) => getViews(b.id) - getViews(a.id));
+    default:           return list;
+  }
+}
+function setSortOrder(value) {
+  currentSort = value;
+  renderProducts();
 }
 
 function filterProducts(cat) {

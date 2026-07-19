@@ -37,6 +37,10 @@
     <a class="nav-item" onclick="showSection('categories')">
       <span class="nav-icon">🗂️</span> Catégories
     </a>
+    <a class="nav-item" onclick="showSection('reviews')">
+      <span class="nav-icon">⭐</span> Avis clients
+      <span class="nav-badge" id="navReviewsBadge" style="display:none">0</span>
+    </a>
   </nav>
 
   <div class="sidebar-footer">
@@ -196,6 +200,20 @@
       <div class="panel-header"><h3>Catégories disponibles</h3></div>
       <div id="catList"></div>
     </div>
+  </section>
+
+  <!-- REVIEWS SECTION -->
+  <section id="sec-reviews" class="section">
+    <div class="section-bar">
+      <div class="search-wrap">
+        <select id="reviewsFilter" onchange="renderReviewsAdmin()">
+          <option value="pending">En attente</option>
+          <option value="approved">Publiés</option>
+          <option value="all">Tous</option>
+        </select>
+      </div>
+    </div>
+    <div id="reviewsList" class="reviews-admin-list"></div>
   </section>
 
 </main>

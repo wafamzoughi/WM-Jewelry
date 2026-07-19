@@ -25,6 +25,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   renderDashboard();
   initLivePreview();
   initImageUpload();
+  updateReviewsBadge();
 
   // Vérifier config JSONBin
   checkJsonBinConfig();
@@ -65,12 +66,13 @@ function showSection(name) {
   document.querySelectorAll(".section").forEach(s => s.classList.remove("active"));
   document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
   document.getElementById(`sec-${name}`).classList.add("active");
-  const map = {dashboard:"Tableau de bord",products:"Articles",add:"Ajouter / Modifier",categories:"Catégories"};
+  const map = {dashboard:"Tableau de bord",products:"Articles",add:"Ajouter / Modifier",categories:"Catégories",reviews:"Avis clients"};
   document.getElementById("topbarTitle").textContent = map[name] || name;
-  document.querySelectorAll(".nav-item")[["dashboard","products","add","categories"].indexOf(name)]?.classList.add("active");
+  document.querySelectorAll(".nav-item")[["dashboard","products","add","categories","reviews"].indexOf(name)]?.classList.add("active");
   if (name === "dashboard")  renderDashboard();
   if (name === "products")   renderProductsTable();
   if (name === "categories") renderCatList();
+  if (name === "reviews")    renderReviewsAdmin();
   if (name === "add" && !editingId) { clearForm(); document.getElementById("formTitle").textContent = "➕ Nouvel Article"; }
 }
 
@@ -79,6 +81,8 @@ function renderDashboard() {
   const withImg    = products.filter(p => p.image).length;
   const outOfStock = products.filter(p => isOutOfStock(p)).length;
   const lowStock    = products.filter(p => isLowStock(p)).length;
+  const pendingReviews = reviews.filter(r => !r.approved).length;
+  const totalViews      = Object.values(views).reduce((s, v) => s + v, 0);
   document.getElementById("statsGrid").innerHTML = `
     <div class="stat-card"><div class="stat-icon">💎</div><div class="stat-num">${products.length}</div><div class="stat-label">Total articles</div></div>
     <div class="stat-card"><div class="stat-icon">🖼️</div><div class="stat-num">${withImg}</div><div class="stat-label">Avec photo</div></div>
@@ -86,6 +90,8 @@ function renderDashboard() {
     <div class="stat-card"><div class="stat-icon">⭐</div><div class="stat-num">${products.filter(p=>p.featured).length}</div><div class="stat-label">Vedettes</div></div>
     <div class="stat-card${outOfStock?' stat-card-danger':''}"><div class="stat-icon">🚫</div><div class="stat-num">${outOfStock}</div><div class="stat-label">Rupture de stock</div></div>
     <div class="stat-card${lowStock?' stat-card-warning':''}"><div class="stat-icon">⚠️</div><div class="stat-num">${lowStock}</div><div class="stat-label">Stock faible</div></div>
+    <div class="stat-card${pendingReviews?' stat-card-warning':''}"><div class="stat-icon">📝</div><div class="stat-num">${pendingReviews}</div><div class="stat-label">Avis en attente</div></div>
+    <div class="stat-card"><div class="stat-icon">👁️</div><div class="stat-num">${totalViews}</div><div class="stat-label">Vues cumulées</div></div>
     <div class="stat-card"><div class="stat-icon">🗂️</div><div class="stat-num">${[...new Set(products.map(p=>p.cat))].length}</div><div class="stat-label">Catégories</div></div>
   `;
   document.getElementById("recentProducts").innerHTML = [...products].reverse().slice(0,6).map(p => `
@@ -95,6 +101,7 @@ function renderDashboard() {
       <div class="recent-price">${p.price.toFixed(3)} DT</div>
     </div>`).join("");
   renderCatChart();
+  updateReviewsBadge();
 }
 
 function renderCatChart() {
@@ -417,6 +424,72 @@ async function deleteProduct(id) {
   await saveProducts(products);
   renderProductsTable(); renderDashboard(); populateCatFilter();
   toast(`✓ "${p.name}" supprimé`);
+}
+
+// ── AVIS CLIENTS (modération) ──
+function updateReviewsBadge() {
+  const badge = document.getElementById("navReviewsBadge");
+  if (!badge) return;
+  const pending = reviews.filter(r => !r.approved).length;
+  badge.textContent = pending;
+  badge.style.display = pending ? "inline-flex" : "none";
+}
+
+function renderReviewsAdmin() {
+  const list = document.getElementById("reviewsList");
+  if (!list) return;
+  const filter = document.getElementById("reviewsFilter")?.value || "pending";
+  const filtered = reviews
+    .filter(r => filter === "all" || (filter === "pending" ? !r.approved : r.approved))
+    .sort((a,b) => new Date(b.date) - new Date(a.date));
+
+  if (!filtered.length) {
+    list.innerHTML = `<div class="no-data"><div class="no-data-icon">📝</div><p>Aucun avis ${filter==="pending"?"en attente":filter==="approved"?"publié":""}</p></div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(r => {
+    const p = products.find(x => x.id === r.productId);
+    return `
+    <div class="review-admin-card${r.approved?'':' pending'}">
+      <div class="review-admin-head">
+        <div>
+          <span class="review-admin-product">${p ? p.name : "Article supprimé"}</span>
+          <span class="review-admin-stars">${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</span>
+        </div>
+        <span class="review-admin-date">${new Date(r.date).toLocaleDateString("fr-FR")}</span>
+      </div>
+      <div class="review-admin-author">${r.name}</div>
+      ${r.comment ? `<p class="review-admin-comment">${r.comment}</p>` : ""}
+      <div class="review-admin-actions">
+        ${!r.approved ? `<button class="btn-edit" onclick="approveReview(${r.id})">✓ Publier</button>` : `<button class="btn-edit" onclick="unapproveReview(${r.id})">↩ Dépublier</button>`}
+        <button class="btn-del" onclick="deleteReview(${r.id})">✕ Supprimer</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+
+async function approveReview(id) {
+  const idx = reviews.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  reviews[idx].approved = true;
+  await saveReviews(reviews);
+  renderReviewsAdmin(); updateReviewsBadge();
+  toast("✓ Avis publié");
+}
+async function unapproveReview(id) {
+  const idx = reviews.findIndex(r => r.id === id);
+  if (idx === -1) return;
+  reviews[idx].approved = false;
+  await saveReviews(reviews);
+  renderReviewsAdmin(); updateReviewsBadge();
+  toast("✓ Avis dépublié");
+}
+async function deleteReview(id) {
+  if (!confirm("Supprimer cet avis ?")) return;
+  await saveReviews(reviews.filter(r => r.id !== id));
+  renderReviewsAdmin(); updateReviewsBadge();
+  toast("✓ Avis supprimé");
 }
 
 // ── CATEGORIES ──

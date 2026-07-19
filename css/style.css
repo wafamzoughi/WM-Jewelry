@@ -82,6 +82,15 @@ img{max-width:100%}
 .product-card.is-out-of-stock .product-img-wrap{opacity:0.55;filter:grayscale(40%)}
 .product-stock-note{font-size:11px;color:#B45309;font-weight:600;margin-top:2px}
 .add-btn-disabled{background:var(--gray-light)!important;color:var(--gray)!important;cursor:not-allowed}
+
+/* RATING STARS (cartes produit + fiche détail) */
+.rating-stars{display:flex;align-items:center;gap:5px;margin:2px 0}
+.rating-stars .stars{color:var(--gold);font-size:13px;letter-spacing:1px}
+.rating-stars .rating-num{font-size:12px;font-weight:600;color:var(--gray)}
+.rating-stars .rating-count{font-size:11px;color:var(--gray)}
+.rating-sm .stars{font-size:12px}
+.rating-lg .stars{font-size:20px;letter-spacing:2px}
+.rating-lg .rating-num{font-size:16px}
 .product-body{padding:18px}
 .product-cat{font-size:10px;color:var(--gold);font-weight:600;letter-spacing:2px;text-transform:uppercase;margin-bottom:5px}
 .product-name{font-family:var(--font-serif);font-size:19px;margin-bottom:6px;line-height:1.2}

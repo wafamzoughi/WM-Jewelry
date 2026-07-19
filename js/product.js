@@ -48,13 +48,17 @@ function loadProduct() {
   bcCat.href = `index.html?cat=${p.cat}`;
   document.getElementById("bcName").textContent = p.name;
 
+  recordView(p.id);
   renderProduct(p);
   renderRelated(p);
+  renderReviewsSection(p);
+  initImageZoomHover();
 }
 
 function renderProduct(p) {
-  const imgHtml = p.image
-    ? `<img src="${p.image}" alt="${p.name}" class="pd-main-img"
+  const hasImg = !!p.image;
+  const imgHtml = hasImg
+    ? `<img src="${p.image}" alt="${p.name}" class="pd-main-img" id="pdMainImg"
          onerror="this.outerHTML='<div class=pd-emoji-img>${p.emoji}</div>'">`
     : `<div class="pd-emoji-img">${p.emoji}</div>`;
 
@@ -70,8 +74,9 @@ function renderProduct(p) {
   document.getElementById("productPage").innerHTML = `
     <div class="pd-layout">
       <div class="pd-left">
-        <div class="pd-img-main${outOfStock?' pd-img-dimmed':''}">
+        <div class="pd-img-main${outOfStock?' pd-img-dimmed':''}${hasImg?' pd-zoomable':''}" id="pdImgMain" ${hasImg?'onclick="openImageLightbox()"':''}>
           ${imgHtml}
+          ${hasImg ? '<span class="pd-zoom-hint">🔍 Cliquer pour zoomer</span>' : ''}
           ${outOfStock ? '<span class="pd-badge-out">Rupture de stock</span>' : (p.isNew ? '<span class="pd-badge-new">NOUVEAU</span>' : "")}
           ${p.featured ? '<span class="pd-badge-feat">⭐ Vedette</span>'  : ""}
         </div>
@@ -90,6 +95,10 @@ function renderProduct(p) {
           ${p.isNew ? '<span class="pd-tag-new">Nouveauté</span>' : ""}
         </div>
         ${stockStatusHtml}
+        <div class="pd-meta-row">
+          ${renderRatingStars(p.id, "lg")}
+          <span class="pd-views">👁 ${getViews(p.id)} vue${getViews(p.id)>1?'s':''}</span>
+        </div>
         <div class="pd-divider"></div>
         <div class="pd-desc-block">
           <h3>Description</h3>
@@ -154,6 +163,131 @@ function renderRelated(p) {
       </div>
     </div>`).join("");
 }
+
+// ── ZOOM IMAGE ──
+function initImageZoomHover() {
+  const wrap = document.getElementById("pdImgMain");
+  const img  = document.getElementById("pdMainImg");
+  if (!wrap || !img) return;
+  if (!window.matchMedia("(hover: hover)").matches) return; // pas de survol sur mobile/tactile
+  wrap.addEventListener("mousemove", e => {
+    const rect = wrap.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width)  * 100;
+    const y = ((e.clientY - rect.top)  / rect.height) * 100;
+    img.style.transformOrigin = `${x}% ${y}%`;
+    img.style.transform = "scale(1.8)";
+  });
+  wrap.addEventListener("mouseleave", () => { img.style.transform = "scale(1)"; });
+}
+
+function openImageLightbox() {
+  const p = currentProduct;
+  if (!p || !p.image) return;
+  let lb = document.getElementById("imgLightbox");
+  if (!lb) {
+    lb = document.createElement("div");
+    lb.id = "imgLightbox";
+    lb.className = "img-lightbox";
+    lb.innerHTML = `<button class="lightbox-close" onclick="closeImageLightbox()" aria-label="Fermer">×</button><img id="lightboxImg" src="" alt="">`;
+    lb.addEventListener("click", e => { if (e.target === lb) closeImageLightbox(); });
+    document.addEventListener("keydown", e => { if (e.key === "Escape") closeImageLightbox(); });
+    document.body.appendChild(lb);
+  }
+  document.getElementById("lightboxImg").src = p.image;
+  requestAnimationFrame(() => lb.classList.add("open"));
+  document.body.style.overflow = "hidden";
+}
+function closeImageLightbox() {
+  const lb = document.getElementById("imgLightbox");
+  if (lb) lb.classList.remove("open");
+  document.body.style.overflow = "";
+}
+
+// ── AVIS CLIENTS ──
+let selectedReviewRating = 5;
+
+function renderReviewsSection(p) {
+  const section = document.getElementById("reviewsSection");
+  if (!section) return;
+
+  const approved = getProductReviews(p.id, true);
+  const avg      = getAverageRating(p.id);
+
+  const summaryHtml = avg !== null
+    ? `<div class="reviews-summary">${renderRatingStars(p.id, "lg")}<span class="reviews-summary-text">basé sur ${approved.length} avis</span></div>`
+    : `<div class="reviews-summary reviews-summary-empty">Aucun avis pour le moment — soyez le premier à donner votre avis !</div>`;
+
+  const listHtml = approved.length
+    ? approved.map(r => `
+      <div class="review-card">
+        <div class="review-head">
+          <span class="review-name">${escapeHtml(r.name)}</span>
+          <span class="review-stars">${"★".repeat(r.rating)}${"☆".repeat(5-r.rating)}</span>
+        </div>
+        <div class="review-date">${new Date(r.date).toLocaleDateString("fr-FR", {day:"numeric",month:"long",year:"numeric"})}</div>
+        ${r.comment ? `<p class="review-comment">${escapeHtml(r.comment)}</p>` : ""}
+      </div>`).join("")
+    : "";
+
+  section.innerHTML = `
+    <div class="reviews-inner">
+      <div class="section-header">
+        <p class="section-eyebrow">Avis clients</p>
+        <h2>Ce qu'ils en pensent</h2>
+      </div>
+      ${summaryHtml}
+      <div class="reviews-list">${listHtml}</div>
+
+      <div class="review-form-box">
+        <h3>Laisser un avis</h3>
+        <div class="review-star-picker" id="reviewStarPicker">
+          ${[1,2,3,4,5].map(n => `<span class="rsp-star" data-n="${n}" onclick="selectReviewRating(${n})">★</span>`).join("")}
+        </div>
+        <input type="text" id="reviewName" class="review-input" placeholder="Votre nom" maxlength="60">
+        <textarea id="reviewComment" class="review-input" rows="3" placeholder="Votre commentaire (optionnel)" maxlength="500"></textarea>
+        <button class="review-submit-btn" onclick="submitReview(${p.id})">Envoyer mon avis</button>
+        <p class="review-note">Votre avis sera publié après validation par notre équipe.</p>
+      </div>
+    </div>`;
+
+  selectedReviewRating = 5;
+  updateStarPicker();
+}
+
+function selectReviewRating(n) {
+  selectedReviewRating = n;
+  updateStarPicker();
+}
+function updateStarPicker() {
+  document.querySelectorAll("#reviewStarPicker .rsp-star").forEach(el => {
+    el.classList.toggle("sel", parseInt(el.dataset.n, 10) <= selectedReviewRating);
+  });
+}
+
+async function submitReview(productId) {
+  const name    = document.getElementById("reviewName").value.trim();
+  const comment = document.getElementById("reviewComment").value.trim();
+  if (!name) { showNotification("⚠ Merci d'indiquer votre nom"); return; }
+
+  const btn = document.querySelector(".review-submit-btn");
+  if (btn) { btn.disabled = true; btn.textContent = "Envoi..."; }
+
+  await addReview({ productId, name, rating: selectedReviewRating, comment });
+
+  if (btn) { btn.disabled = false; btn.textContent = "Envoyer mon avis"; }
+  document.getElementById("reviewName").value = "";
+  document.getElementById("reviewComment").value = "";
+  selectedReviewRating = 5;
+  updateStarPicker();
+  showNotification("✓ Merci ! Votre avis sera publié après validation.");
+}
+
+function escapeHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
 
 function changeQtyPage(delta) {
   selectedQty = Math.max(1, selectedQty + delta);

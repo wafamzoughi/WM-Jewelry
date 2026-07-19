@@ -70,18 +70,24 @@ function isLowStock(p) {
 }
 
 // ── STATE ──
-let products = [];
-let nextId   = 1;
-let _dbReady = false;  // true quand JSONBin est configuré et chargé
+let products      = [];
+let nextId        = 1;
+let reviews       = [];   // {id, productId, name, rating(1-5), comment, date, approved}
+let reviewNextId  = 1;
+let views         = {};   // { [productId]: totalViewCount }
+let _dbReady      = false;  // true quand JSONBin est configuré et chargé
 
-// ── CHARGER LES PRODUITS ──
+// ── CHARGER LES PRODUITS (+ avis + vues) ──
 async function loadProducts() {
   // Si JSONBin pas configuré → produits locaux
   if (!JSONBIN_BIN_ID || JSONBIN_BIN_ID === "VOTRE_BIN_ID_ICI") {
     console.warn("⚠️ JSONBin non configuré — mode local");
-    products = DEFAULT_PRODUCTS;
-    nextId   = Math.max(...products.map(p => p.id), 0) + 1;
-    _dbReady = false;
+    products     = DEFAULT_PRODUCTS;
+    nextId       = Math.max(...products.map(p => p.id), 0) + 1;
+    reviews      = [];
+    reviewNextId = 1;
+    views        = {};
+    _dbReady     = false;
     return products;
   }
 
@@ -97,26 +103,43 @@ async function loadProducts() {
 
     const data = await res.json();
 
-    // JSONBin retourne { record: { products, nextId } } ou directement { products, nextId }
+    // JSONBin retourne { record: { products, nextId, reviews, views } } ou directement l'objet
     const record = data.record || data;
 
     if (record.products && Array.isArray(record.products)) {
-      products = record.products;
-      nextId   = record.nextId || Math.max(...products.map(p => p.id), 0) + 1;
-      _dbReady = true;
+      products     = record.products;
+      nextId       = record.nextId || Math.max(...products.map(p => p.id), 0) + 1;
+      reviews      = Array.isArray(record.reviews) ? record.reviews : [];
+      reviewNextId = record.reviewNextId || Math.max(...reviews.map(r => r.id), 0) + 1;
+      views        = record.views && typeof record.views === "object" ? record.views : {};
+      _dbReady     = true;
       console.log(`✅ ${products.length} produits chargés depuis JSONBin`);
     } else {
       // Bin vide ou mal formaté → initialiser
-      products = [];
-      nextId   = 1;
-      _dbReady = true;
-      await saveProducts(products);
+      products     = [];
+      nextId       = 1;
+      reviews      = [];
+      reviewNextId = 1;
+      views        = {};
+      _dbReady     = true;
+      await persistAll();
     }
   } catch (e) {
     console.error("❌ Erreur JSONBin:", e);
     // Fallback localStorage
     const local = localStorage.getItem("wm_products_backup");
-    products = local ? JSON.parse(local) : DEFAULT_PRODUCTS;
+    const localData = local ? JSON.parse(local) : null;
+    if (localData && Array.isArray(localData)) {
+      // ancien format (juste un tableau de produits)
+      products = localData; reviews = []; reviewNextId = 1; views = {};
+    } else if (localData && localData.products) {
+      products     = localData.products;
+      reviews      = localData.reviews || [];
+      reviewNextId = localData.reviewNextId || 1;
+      views        = localData.views || {};
+    } else {
+      products = DEFAULT_PRODUCTS; reviews = []; reviewNextId = 1; views = {};
+    }
     nextId   = Math.max(...products.map(p => p.id), 0) + 1;
     _dbReady = false;
   }
@@ -124,12 +147,10 @@ async function loadProducts() {
   return products;
 }
 
-// ── SAUVEGARDER LES PRODUITS ──
-async function saveProducts(newProducts) {
-  products = newProducts;
-
+// ── SAUVEGARDE COMPLÈTE (produits + avis + vues) ──
+async function persistAll() {
   // Toujours sauvegarder en backup localStorage
-  localStorage.setItem("wm_products_backup", JSON.stringify(products));
+  localStorage.setItem("wm_products_backup", JSON.stringify({ products, reviews, reviewNextId, views }));
 
   if (!_dbReady || !JSONBIN_BIN_ID || JSONBIN_BIN_ID === "VOTRE_BIN_ID_ICI") {
     console.warn("⚠️ JSONBin non dispo — sauvegarde locale uniquement");
@@ -144,17 +165,77 @@ async function saveProducts(newProducts) {
         "X-Master-Key": JSONBIN_API_KEY
       },
       body: JSON.stringify({
-        products: products,
-        nextId:   nextId,
+        products, nextId, reviews, reviewNextId, views,
         updatedAt: new Date().toISOString()
       })
     });
 
     if (!res.ok) throw new Error(`JSONBin PUT erreur ${res.status}`);
-    console.log("✅ Produits sauvegardés sur JSONBin");
+    console.log("✅ Données sauvegardées sur JSONBin");
     return true;
   } catch (e) {
     console.error("❌ Erreur sauvegarde JSONBin:", e);
     return false;
   }
+}
+
+// ── SAUVEGARDER LES PRODUITS (compat avec le code existant) ──
+async function saveProducts(newProducts) {
+  products = newProducts;
+  return persistAll();
+}
+
+// ── AVIS CLIENTS ──
+function getProductReviews(productId, approvedOnly = true) {
+  return reviews
+    .filter(r => r.productId === productId && (!approvedOnly || r.approved))
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+function getAverageRating(productId) {
+  const list = getProductReviews(productId, true);
+  if (!list.length) return null;
+  return list.reduce((s, r) => s + r.rating, 0) / list.length;
+}
+async function addReview({ productId, name, rating, comment }) {
+  const review = {
+    id: reviewNextId++,
+    productId,
+    name: (name || "Client").trim().slice(0, 60),
+    rating: Math.min(5, Math.max(1, Math.round(rating))),
+    comment: (comment || "").trim().slice(0, 500),
+    date: new Date().toISOString(),
+    approved: false   // modéré depuis l'admin avant publication
+  };
+  reviews.push(review);
+  await persistAll();
+  return review;
+}
+async function saveReviews(newReviews) {
+  reviews = newReviews;
+  return persistAll();
+}
+
+// ── AFFICHAGE ÉTOILES (partagé main.js / product.js) ──
+function renderRatingStars(productId, size = "sm") {
+  const avg = getAverageRating(productId);
+  if (avg === null) return "";
+  const count   = getProductReviews(productId, true).length;
+  const rounded = Math.round(avg);
+  const stars   = "★".repeat(rounded) + "☆".repeat(5 - rounded);
+  return `<div class="rating-stars rating-${size}"><span class="stars">${stars}</span><span class="rating-num">${avg.toFixed(1)}</span><span class="rating-count">(${count} avis)</span></div>`;
+}
+
+// ── COMPTEUR DE VUES ──
+// Une vue = un visiteur unique (par navigateur) par produit et par jour, pour limiter
+// le nombre d'écritures JSONBin (quota du plan gratuit) et éviter le gonflement au rechargement.
+function getViews(productId) {
+  return views[productId] || 0;
+}
+function recordView(productId) {
+  const today   = new Date().toISOString().slice(0, 10);
+  const seenKey = `wm_seen_${productId}_${today}`;
+  if (localStorage.getItem(seenKey)) return; // déjà compté aujourd'hui sur ce navigateur
+  localStorage.setItem(seenKey, "1");
+  views[productId] = (views[productId] || 0) + 1;
+  persistAll(); // fire-and-forget, ne bloque pas l'affichage de la page
 }
